@@ -1,0 +1,9 @@
+services:
+  ironrod:
+    build: .
+    container_name: ironrod
+    restart: unless-stopped
+    ports:
+      - "8080:8000"   # open http://<server>:8080 (or your Tailscale name)
+    volumes:
+      - ./data:/data  # the database: notes, highlights, everything. Back this up!

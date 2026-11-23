@@ -1,0 +1,62 @@
+/* Iron Rod theme tokens -- change colors here and the whole app follows. */
+:root {
+	--bg: #0b0d10;
+	--bg-raised: #0e1115;
+	--surface: #12161b;
+	--surface-hover: #161c23;
+	--border: #1f2630;
+	--border-strong: #2a3340;
+
+	--text: #e6eaf0;
+	--text-soft: #d3d9e2;
+	--text-muted: #b4becc;
+	--text-faint: #8a96a8;
+
+	--accent: #5eead4;
+	--accent-ink: #062320;
+	--accent-dim: #0f2a28;
+	--accent-line: #234b47;
+
+	/* highlight meanings (phase 2) */
+	--hl-promise: #f5b454;
+	--hl-christ: #5eead4;
+	--hl-doctrine: #7da2ff;
+	--hl-question: #c89bff;
+
+	--font-ui: 'Inter Variable', system-ui, sans-serif;
+	--font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+	--font-scripture: 'Source Serif 4 Variable', Georgia, serif;
+
+	--radius: 6px;
+	color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--font-ui);
+	-webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); }
+
+button { font-family: inherit; }
+
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.mono { font-family: var(--font-mono); }
+
+.sr-only {
+	position: absolute; width: 1px; height: 1px; overflow: hidden;
+	clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-track { background: transparent; }

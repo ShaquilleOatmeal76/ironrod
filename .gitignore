@@ -1,0 +1,23 @@
+# Databases and imported content (never commit: personal notes + copyrighted talks)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node / SvelteKit
+node_modules/
+frontend/.svelte-kit/
+frontend/build/
+backend/app/static/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+.env
