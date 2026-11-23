@@ -12,8 +12,8 @@ notes stay on your server.
 |---|---|---|
 | 1 | Foundation: repo, scripture data, reader | ✅ done |
 | 2 | Markup: highlights, notes (rich editor), links | ✅ done |
-| 3 | Finding things: command palette (⌘K), search, shortcuts | ⏳ next |
-| 4 | Talks & more: conference, BYU speeches, Come Follow Me, split view | |
+| 3 | Finding things: command palette (⌘K), search, shortcuts | ✅ done |
+| 4 | Talks & more: conference, BYU speeches, Come Follow Me, split view | ⏳ next |
 | 5 | Plans & goals: reading plans, tracker | |
 | 6 | Polish: graph view, phone layout, remote access, installable app | |
 | 7 | Phone app: Capacitor wrapper, offline reading, notifications | |
@@ -97,6 +97,15 @@ A few ideas worth knowing:
 - **A reference parser.** `backend/app/refs.py` turns `1 ne 3:7`, `D&C 4:2-4`
   or `heb 11` into verse id ranges, and back into labels. `@` references in
   notes, the link box, and (soon) the command palette all use it.
+- **Search that can't be broken.** SQLite's full-text search has its own query
+  language, so `backend/app/search.py` rebuilds every query from plain words
+  and "quoted phrases" — a stray `"` or `NOT` can't cause an error. The index
+  uses the Porter stemmer, so `believe` also finds `believed` and `believing`.
+  Matches come back as `[{text, hit}]` pieces rather than HTML, so the UI
+  highlights them without ever rendering markup.
+- **Commands register themselves.** `frontend/src/lib/commands.svelte.js` holds
+  the palette's command list. The layout adds global ones; the reader adds
+  verse commands (highlight, note, copy) while it's open.
 - **Shared reading state.** `frontend/src/lib/reader.svelte.js` holds what's
   open and selected. The header, sidebar and status bar all read from it.
 
@@ -116,13 +125,17 @@ A few ideas worth knowing:
 | PATCH/DELETE | `/api/notes/{id}` | edit · delete |
 | GET | `/api/tags` | tags with counts |
 | POST/DELETE | `/api/links`, `/api/links/{id}` | link two verses · remove |
+| GET | `/api/search?q=&scope=&kinds=&limit=&offset=` | reference, books, verses, notes and tags in one call |
 
 Interactive docs: `http://<server>:8080/docs`
 
 ## Keyboard
 
+Press `?` in the app for the full list.
+
 | Key | Action |
 |---|---|
+| `⌘K` / `Ctrl K` or `/` | command palette: go to a verse, search, run commands |
 | `j` / `k` (or ↓ / ↑) | next / previous verse |
 | `]` / `[` | next / previous chapter |
 | `esc` | clear selection |
@@ -131,8 +144,11 @@ Interactive docs: `http://<server>:8080/docs`
 | `l` | link the selected verse to another |
 | `y` | copy the verse with its reference |
 | `g` then `n` | all notes |
+| `g` then `s` | search page |
 | `g` then `r` | back to reading |
 | `⌘/Ctrl + Enter` | save a note |
+
+In the palette, start with `>` for commands only or `#` for tags; `tab` switches between all · verses · notes · commands.
 
 In a note, type `@` for a verse (`@heb 11:1`) and `#` for a tag (`#faith`).
 

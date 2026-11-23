@@ -36,6 +36,9 @@ export const api = {
 	chapter: (volume, book, chapter, f = fetch) => get(f, `/read/${volume}/${book}/${chapter}`),
 	health: (f = fetch) => get(f, '/health'),
 
+	// search (command palette + search page)
+	search: (q, params = {}) => get(fetch, `/search?${qs({ q, ...params })}`),
+
 	// references
 	resolveRef: (q) => get(fetch, `/refs/resolve?${qs({ q })}`),
 	suggestRefs: (q) => get(fetch, `/refs/suggest?${qs({ q })}`),

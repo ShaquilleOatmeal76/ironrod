@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import db
 from app.refs import RefIndex
-from app.routers import library, markup
+from app.routers import library, markup, search
 
 STATIC_DIR = Path(os.environ.get("IRONROD_STATIC", Path(__file__).parent / "static"))
 AUTO_IMPORT = os.environ.get("IRONROD_AUTO_IMPORT", "1") == "1"
@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Iron Rod", lifespan=lifespan)
 app.include_router(library.router)
 app.include_router(markup.router)
+app.include_router(search.router)
 
 
 @app.get("/api/health")

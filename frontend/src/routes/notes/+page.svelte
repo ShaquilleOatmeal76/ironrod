@@ -77,7 +77,7 @@
 		</div>
 	{/if}
 
-	<details class="free">
+	<details class="free" open={page.url.hash === '#new'}>
 		<summary class="mono">+ new note (not tied to a verse)</summary>
 		<NoteEditor onsave={addFree} saveLabel="Save note" />
 	</details>

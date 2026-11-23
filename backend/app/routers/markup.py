@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from app import notes_html
 from app.deps import get_conn, get_refs, get_user_id
+from app.search import fts_query
 
 router = APIRouter(prefix="/api", tags=["markup"])
 
@@ -196,10 +197,10 @@ def list_notes(q: str | None = None, tag: str | None = None, limit: int = Query(
         sql += " JOIN note_tags nt ON nt.note_id = n.id JOIN tags t ON t.id = nt.tag_id"
         where.append("t.name = ?")
         args.append(tag.lstrip("#"))
-    if q and q.strip():
+    match = fts_query(q or "")
+    if match:
         where.append("n.id IN (SELECT rowid FROM notes_fts WHERE notes_fts MATCH ?)")
-        # quote each word so punctuation can't break the FTS query syntax
-        args.append(" ".join('"' + w.replace('"', "") + '"*' for w in q.split()))
+        args.append(match)
     if where:
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY n.updated_at DESC, n.id DESC LIMIT ?"

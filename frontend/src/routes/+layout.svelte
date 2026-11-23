@@ -5,33 +5,65 @@
 	import '../app.css';
 
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import StatusBar from '#lib/components/StatusBar.svelte';
 	import SuggestPopup from '#lib/components/SuggestPopup.svelte';
-	import { reader } from '#lib/reader.svelte.js';
+	import CommandPalette from '#lib/components/CommandPalette.svelte';
+	import ShortcutsHelp from '#lib/components/ShortcutsHelp.svelte';
+	import { reader, lastRead } from '#lib/reader.svelte.js';
+	import { palette, openPalette, registerCommands } from '#lib/commands.svelte.js';
 	import { api, chapterHref } from '#lib/api.js';
-	import { goto } from '$app/navigation';
-	import { lastRead } from '#lib/reader.svelte.js';
 
 	let { data, children } = $props();
 
-	// Two-key "go to" shortcuts: g n = notes, g r = back to reading.
+	function backToReading() {
+		const l = lastRead();
+		goto(chapterHref(l.volume, l.book, l.chapter));
+	}
+
+	// Commands that work on every page.
+	$effect(() =>
+		registerCommands([
+			{ id: 'go-notes', title: 'Go to all notes', group: 'go', keys: 'g n', run: () => goto('/notes') },
+			{ id: 'go-search', title: 'Open search page', group: 'go', keys: 'g s', run: () => goto('/search') },
+			{ id: 'go-read', title: 'Back to reading', group: 'go', keys: 'g r', run: backToReading },
+			{ id: 'new-note', title: 'New note (not tied to a verse)', group: 'notes', run: () => goto('/notes#new') },
+			{ id: 'library', title: 'Open library', group: 'go', run: () => (reader.sidebarOpen = true), when: () => window.innerWidth <= 900 },
+			{ id: 'help', title: 'Show keyboard shortcuts', group: 'help', keys: '?', run: () => (palette.help = true) },
+			...data.volumes.map((v) => ({
+				id: `vol-${v.slug}`,
+				title: `Open ${v.title}`,
+				group: 'go',
+				hint: v.short_title,
+				run: () => goto(chapterHref(v.slug, v.books[0].slug, 1))
+			}))
+		])
+	);
+
+	// Global keys. ⌘K / Ctrl+K works even while typing; the rest don't.
 	let gPressed = 0;
 	function onKey(e) {
-		const t = /** @type {HTMLElement} */ (e.target);
-		if (e.metaKey || e.ctrlKey || e.altKey) return;
-		if (t.closest('input, textarea, select, [contenteditable="true"]')) return;
-		if (e.key === 'g') {
-			gPressed = Date.now();
+		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+			e.preventDefault();
+			palette.open ? (palette.open = false) : openPalette();
 			return;
 		}
-		if (Date.now() - gPressed < 800) {
+		const t = /** @type {HTMLElement} */ (e.target);
+		if (e.metaKey || e.ctrlKey || e.altKey || palette.open || palette.help) return;
+		if (t.closest('input, textarea, select, [contenteditable="true"]')) return;
+		if (e.key === '/') {
+			e.preventDefault();
+			openPalette();
+		} else if (e.key === '?') {
+			palette.help = true;
+		} else if (e.key === 'g') {
+			gPressed = Date.now();
+		} else if (Date.now() - gPressed < 800) {
 			gPressed = 0;
 			if (e.key === 'n') goto('/notes');
-			else if (e.key === 'r') {
-				const l = lastRead();
-				goto(chapterHref(l.volume, l.book, l.chapter));
-			}
+			else if (e.key === 's') goto('/search');
+			else if (e.key === 'r') backToReading();
 		}
 	}
 
@@ -51,11 +83,7 @@
 
 <div class="shell">
 	<header class="top">
-		<button
-			class="icon menu"
-			aria-label="Open library"
-			onclick={() => (reader.sidebarOpen = true)}
-		>
+		<button class="icon menu" aria-label="Open library" onclick={() => (reader.sidebarOpen = true)}>
 			<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
 		</button>
 		<a class="brand" href="/">
@@ -64,11 +92,18 @@
 		</a>
 		{#if reader.current}
 			<nav class="crumbs mono" aria-label="Breadcrumb">
-				<span>~/{reader.current.volume}</span><span aria-hidden="true">/</span><span
-					>{reader.current.book}</span
-				><span aria-hidden="true">/</span><span class="here">{reader.current.chapter}</span>
+				<span>~/{reader.current.volume}</span><span aria-hidden="true">/</span><span>{reader.current.book}</span><span aria-hidden="true">/</span><span class="here">{reader.current.chapter}</span>
 			</nav>
 		{/if}
+		<span class="grow"></span>
+		<button class="trigger" onclick={() => openPalette()}>
+			<span class="mono prompt" aria-hidden="true">&gt;</span>
+			<span class="label">Go to, search notes, run a command…</span>
+			<span class="mono kbd">⌘K</span>
+		</button>
+		<button class="icon search" aria-label="Search" onclick={() => openPalette()}>
+			<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+		</button>
 	</header>
 
 	<div class="body">
@@ -82,13 +117,11 @@
 </div>
 
 <SuggestPopup />
+<CommandPalette />
+<ShortcutsHelp />
 
 <style>
-	.shell {
-		height: 100dvh;
-		display: flex;
-		flex-direction: column;
-	}
+	.shell { height: 100dvh; display: flex; flex-direction: column; }
 	.top {
 		display: flex;
 		align-items: center;
@@ -119,6 +152,26 @@
 		white-space: nowrap;
 	}
 	.here { color: var(--text); }
+	.grow { flex: 1; }
+	.trigger {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		width: min(380px, 40vw);
+		height: 40px;
+		padding: 0 12px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		background: var(--surface);
+		color: var(--text-faint);
+		font: 14px var(--font-ui);
+		text-align: left;
+		cursor: pointer;
+	}
+	.trigger:hover { border-color: var(--border-strong); color: var(--text-muted); }
+	.trigger .label { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+	.prompt { color: var(--accent); }
+	.kbd { font-size: 12px; border: 1px solid var(--border-strong); border-radius: 4px; padding: 1px 6px; }
 	.icon {
 		all: unset;
 		box-sizing: border-box;
@@ -132,19 +185,15 @@
 		color: var(--text-muted);
 		cursor: pointer;
 	}
-	.body {
-		flex: 1;
-		display: flex;
-		min-height: 0;
-	}
-	.main {
-		flex: 1;
-		min-width: 0;
-		overflow-y: auto;
-	}
+	.body { flex: 1; display: flex; min-height: 0; }
+	.main { flex: 1; min-width: 0; overflow-y: auto; }
 	@media (max-width: 900px) {
 		.icon.menu { display: inline-flex; }
 		.top { padding: 0 12px; gap: 12px; }
+	}
+	@media (max-width: 700px) {
+		.trigger { display: none; }
+		.icon.search { display: inline-flex; }
 	}
 	@media (max-width: 520px) {
 		.crumbs { display: none; }

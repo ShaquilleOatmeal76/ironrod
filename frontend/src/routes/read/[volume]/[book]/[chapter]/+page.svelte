@@ -6,6 +6,7 @@
 	import { reader, rememberLast } from '#lib/reader.svelte.js';
 	import { HIGHLIGHTS, byId, byKey } from '#lib/highlights.js';
 	import VersePanel from '#lib/components/VersePanel.svelte';
+	import { palette, registerCommands, pushRecent } from '#lib/commands.svelte.js';
 
 	let { data } = $props();
 	const ch = $derived(data.chapter);
@@ -33,6 +34,7 @@
 		const c = ch;
 		reader.current = { volume: c.volume, book: c.book, book_title: c.book_title, chapter: c.chapter };
 		rememberLast(c.volume, c.book, c.chapter);
+		pushRecent({ label: `${c.book_title} ${c.chapter}`, href: chapterHref(c.volume, c.book, c.chapter) });
 		const m = page.url.hash.match(/^#v(\d+)$/);
 		reader.verse = m && Number(m[1]) <= c.verses.length ? Number(m[1]) : null;
 		sheetOpen = false;
@@ -99,6 +101,32 @@
 		}
 	}
 
+	// Palette commands for this page. "when" hides the verse ones until a verse is selected.
+	$effect(() =>
+		registerCommands([
+			...HIGHLIGHTS.map((h) => ({
+				id: `hl-${h.id}`,
+				title: `Highlight as ${h.label}`,
+				hint: `hl ${h.id}`,
+				group: 'verse',
+				keys: h.key,
+				run: () => highlight(h.id),
+				when: () => !!selected
+			})),
+			{ id: 'hl-clear', title: 'Clear highlight', hint: 'hl remove', group: 'verse', run: clearHighlight, when: () => !!ann[reader.verse ?? 0]?.highlight },
+			{ id: 'note', title: 'Write a note on this verse', group: 'verse', keys: 'n', run: openNotes, when: () => !!selected },
+			{ id: 'link', title: 'Link this verse to another', group: 'verse', keys: 'l', run: openLinks, when: () => !!selected },
+			{ id: 'copy', title: 'Copy verse with reference', group: 'verse', keys: 'y', run: copyVerse, when: () => !!selected },
+			{ id: 'next-ch', title: `Next chapter${ch.next ? ` (${ch.next.book_title} ${ch.next.chapter})` : ''}`, group: 'go', keys: ']', run: () => go(ch.next), when: () => !!ch.next },
+			{ id: 'prev-ch', title: `Previous chapter${ch.prev ? ` (${ch.prev.book_title} ${ch.prev.chapter})` : ''}`, group: 'go', keys: '[', run: () => go(ch.prev), when: () => !!ch.prev }
+		])
+	);
+
+	async function clearHighlight() {
+		const cur = ann[reader.verse ?? 0]?.highlight;
+		if (cur) await highlight(cur);
+	}
+
 	function flash(msg) {
 		toast = msg;
 		setTimeout(() => (toast = ''), 1600);
@@ -107,7 +135,7 @@
 	// Keyboard shortcuts (ignored while typing).
 	function onKey(e) {
 		const t = /** @type {HTMLElement} */ (e.target);
-		if (e.metaKey || e.ctrlKey || e.altKey) return;
+		if (e.metaKey || e.ctrlKey || e.altKey || palette.open || palette.help) return;
 		if (t.closest('input, textarea, select, [contenteditable="true"]')) return;
 		const last = ch.verses.length;
 		if (e.key === 'j' || e.key === 'ArrowDown') {

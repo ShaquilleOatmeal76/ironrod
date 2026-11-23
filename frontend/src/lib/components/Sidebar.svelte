@@ -47,6 +47,11 @@
 		<input type="search" placeholder="filter books…" bind:value={filter} />
 	</label>
 
+	<a class="volume notes-link" href="/search" onclick={close}>
+		<span class="dot" aria-hidden="true"></span>
+		<span class="grow">Search</span>
+		<span class="mono faint">g s</span>
+	</a>
 	<a class="volume notes-link" href="/notes" onclick={close}>
 		<span class="dot" aria-hidden="true"></span>
 		<span class="grow">All Notes</span>
@@ -161,7 +166,8 @@
 		font-size: 14px;
 		color: var(--text-muted);
 	}
-	.notes-link { text-decoration: none; margin-bottom: 14px; }
+	.notes-link { text-decoration: none; }
+	.notes-link + .lib { margin-top: 14px; }
 	.lib { padding-top: 2px; }
 	.volume:hover, .book:hover { background: var(--surface-hover); }
 	.volume.active { color: var(--text); }
