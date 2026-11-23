@@ -47,7 +47,12 @@
 		<input type="search" placeholder="filter books…" bind:value={filter} />
 	</label>
 
-	<div class="label mono">LIBRARY</div>
+	<a class="volume notes-link" href="/notes" onclick={close}>
+		<span class="dot" aria-hidden="true"></span>
+		<span class="grow">All Notes</span>
+		<span class="mono faint">g n</span>
+	</a>
+	<div class="label mono lib">LIBRARY</div>
 	<nav>
 		{#each filtered as v (v.slug)}
 			{@const vOpen = openVolume === v.slug || !!filter.trim()}
@@ -156,6 +161,8 @@
 		font-size: 14px;
 		color: var(--text-muted);
 	}
+	.notes-link { text-decoration: none; margin-bottom: 14px; }
+	.lib { padding-top: 2px; }
 	.volume:hover, .book:hover { background: var(--surface-hover); }
 	.volume.active { color: var(--text); }
 	.dot { width: 6px; height: 6px; border-radius: 1px; background: var(--border-strong); }

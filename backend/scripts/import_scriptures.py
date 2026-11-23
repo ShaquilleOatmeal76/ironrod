@@ -52,7 +52,7 @@ def import_from(source: Path, conn: sqlite3.Connection) -> int:
             conn.execute(
                 "INSERT INTO books (id, volume_id, slug, title, long_title, subtitle, short_title, position)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (b["id"], b["volume_id"], b["book_lds_url"], b["book_title"], b["book_long_title"],
+                (b["id"], b["volume_id"], b["book_lds_url"], clean(b["book_title"]), clean(b["book_long_title"]),
                  b["book_subtitle"] or "", b["book_short_title"], b["id"]),
             )
         conn.executemany(

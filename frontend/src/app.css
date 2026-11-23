@@ -60,3 +60,36 @@ button { font-family: inherit; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; border: 2px solid var(--bg); }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* --- Rich note text (shared by the editor and saved notes) --- */
+.note-body { font-size: 14px; line-height: 1.6; color: var(--text-soft); overflow-wrap: anywhere; }
+.note-body p { margin: 0 0 0.6em; }
+.note-body p:last-child { margin-bottom: 0; }
+.note-body h2, .note-body h3 { margin: 0.4em 0 0.3em; font-size: 15px; color: var(--text); }
+.note-body ul, .note-body ol { margin: 0 0 0.6em; padding-left: 1.3em; }
+.note-body blockquote {
+	margin: 0 0 0.6em; padding: 2px 0 2px 12px;
+	border-left: 2px solid var(--border-strong);
+	font-family: var(--font-scripture); color: var(--text-muted);
+}
+.note-body code { font-family: var(--font-mono); font-size: 0.9em; }
+.note-body span[data-type='verseRef'],
+.note-body span[data-type='tag'] {
+	display: inline-block;
+	padding: 0 6px;
+	border-radius: 4px;
+	font-family: var(--font-mono);
+	font-size: 0.86em;
+	line-height: 1.6;
+	white-space: nowrap;
+}
+.note-body span[data-type='verseRef'] {
+	color: var(--hl-doctrine);
+	background: rgba(125, 162, 255, 0.1);
+	border: 1px solid rgba(125, 162, 255, 0.28);
+	cursor: pointer;
+}
+.note-body span[data-type='tag'] {
+	color: var(--text-muted);
+	background: #1a2029;
+}

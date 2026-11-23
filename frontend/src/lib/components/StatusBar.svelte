@@ -12,7 +12,7 @@
 	<span class="mode">READ</span>
 	<span class="seg ref">{ref}</span>
 	<span class="grow"></span>
-	<span class="seg keys">j/k verse · [ ] chapter · esc clear</span>
+	<span class="seg keys">j/k verse · 1–4 highlight · n note · l link · [ ] chapter</span>
 	<span class="seg sync" class:offline={!reader.online}>
 		● {reader.online ? 'connected' : 'offline'}
 	</span>

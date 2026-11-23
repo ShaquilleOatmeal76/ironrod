@@ -13,7 +13,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import db
-from app.routers import library
+from app.refs import RefIndex
+from app.routers import library, markup
 
 STATIC_DIR = Path(os.environ.get("IRONROD_STATIC", Path(__file__).parent / "static"))
 AUTO_IMPORT = os.environ.get("IRONROD_AUTO_IMPORT", "1") == "1"
@@ -29,12 +30,14 @@ async def lifespan(app: FastAPI):
         from scripts import import_scriptures
         import_scriptures.run(conn=conn)
     app.state.conn = conn
+    app.state.refs = RefIndex(conn)
     yield
     conn.close()
 
 
 app = FastAPI(title="Iron Rod", lifespan=lifespan)
 app.include_router(library.router)
+app.include_router(markup.router)
 
 
 @app.get("/api/health")

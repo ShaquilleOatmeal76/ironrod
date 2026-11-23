@@ -7,10 +7,33 @@
 	import { onMount } from 'svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import StatusBar from '#lib/components/StatusBar.svelte';
+	import SuggestPopup from '#lib/components/SuggestPopup.svelte';
 	import { reader } from '#lib/reader.svelte.js';
-	import { api } from '#lib/api.js';
+	import { api, chapterHref } from '#lib/api.js';
+	import { goto } from '$app/navigation';
+	import { lastRead } from '#lib/reader.svelte.js';
 
 	let { data, children } = $props();
+
+	// Two-key "go to" shortcuts: g n = notes, g r = back to reading.
+	let gPressed = 0;
+	function onKey(e) {
+		const t = /** @type {HTMLElement} */ (e.target);
+		if (e.metaKey || e.ctrlKey || e.altKey) return;
+		if (t.closest('input, textarea, select, [contenteditable="true"]')) return;
+		if (e.key === 'g') {
+			gPressed = Date.now();
+			return;
+		}
+		if (Date.now() - gPressed < 800) {
+			gPressed = 0;
+			if (e.key === 'n') goto('/notes');
+			else if (e.key === 'r') {
+				const l = lastRead();
+				goto(chapterHref(l.volume, l.book, l.chapter));
+			}
+		}
+	}
 
 	// Ping the server now and then so the status bar can show "offline".
 	onMount(() => {
@@ -23,6 +46,8 @@
 		return () => clearInterval(id);
 	});
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 <div class="shell">
 	<header class="top">
@@ -55,6 +80,8 @@
 
 	<StatusBar />
 </div>
+
+<SuggestPopup />
 
 <style>
 	.shell {

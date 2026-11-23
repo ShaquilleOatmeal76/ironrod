@@ -11,11 +11,12 @@ notes stay on your server.
 | Phase | What | State |
 |---|---|---|
 | 1 | Foundation: repo, scripture data, reader | ✅ done |
-| 2 | Markup: highlights, notes (rich editor), links | ⏳ next |
-| 3 | Finding things: command palette (⌘K), search, shortcuts | |
+| 2 | Markup: highlights, notes (rich editor), links | ✅ done |
+| 3 | Finding things: command palette (⌘K), search, shortcuts | ⏳ next |
 | 4 | Talks & more: conference, BYU speeches, Come Follow Me, split view | |
 | 5 | Plans & goals: reading plans, tracker | |
-| 6 | Polish: graph view, phone layout, remote access | |
+| 6 | Polish: graph view, phone layout, remote access, installable app | |
+| 7 | Phone app: Capacitor wrapper, offline reading, notifications | |
 | later | Family accounts, groups, private journal | |
 
 ## Run it (Docker)
@@ -89,6 +90,13 @@ A few ideas worth knowing:
 - **Global verse ids.** Every verse has a sequential id across the whole canon,
   so a range like *Alma 32:21–28* is just `id BETWEEN a AND b`. Highlights,
   notes and links will all point at ranges like this.
+- **Notes are sanitized on the server.** Notes are rich text (HTML), and HTML
+  from a browser is untrusted. Every note goes through an allowlist sanitizer
+  (`backend/app/notes_html.py`) so a `<script>` can never be saved and run in
+  someone else's browser (stored XSS). There's a test that tries.
+- **A reference parser.** `backend/app/refs.py` turns `1 ne 3:7`, `D&C 4:2-4`
+  or `heb 11` into verse id ranges, and back into labels. `@` references in
+  notes, the link box, and (soon) the command palette all use it.
 - **Shared reading state.** `frontend/src/lib/reader.svelte.js` holds what's
   open and selected. The header, sidebar and status bar all read from it.
 
@@ -99,6 +107,15 @@ A few ideas worth knowing:
 | GET | `/api/volumes` | volumes → books → chapter counts |
 | GET | `/api/read/{volume}/{book}/{chapter}` | verses + prev/next chapter |
 | GET | `/api/health` | `{"status": "ok"}` |
+| GET | `/api/refs/resolve?q=alma 32:21` | verse range for a typed reference |
+| GET | `/api/refs/suggest?q=` | autocomplete for `@` references |
+| GET | `/api/annotations/{volume}/{book}/{chapter}` | per-verse highlight + note/link counts |
+| GET | `/api/verses/{id}` | one verse: highlight, notes, links |
+| PUT | `/api/highlights` | set or clear a highlight |
+| GET/POST | `/api/notes` | search/filter notes · create a note |
+| PATCH/DELETE | `/api/notes/{id}` | edit · delete |
+| GET | `/api/tags` | tags with counts |
+| POST/DELETE | `/api/links`, `/api/links/{id}` | link two verses · remove |
 
 Interactive docs: `http://<server>:8080/docs`
 
@@ -109,6 +126,15 @@ Interactive docs: `http://<server>:8080/docs`
 | `j` / `k` (or ↓ / ↑) | next / previous verse |
 | `]` / `[` | next / previous chapter |
 | `esc` | clear selection |
+| `1` `2` `3` `4` | highlight: promise · Christ · doctrine · question (press again to clear) |
+| `n` | write a note on the selected verse |
+| `l` | link the selected verse to another |
+| `y` | copy the verse with its reference |
+| `g` then `n` | all notes |
+| `g` then `r` | back to reading |
+| `⌘/Ctrl + Enter` | save a note |
+
+In a note, type `@` for a verse (`@heb 11:1`) and `#` for a tag (`#faith`).
 
 ## Content & copyright
 
