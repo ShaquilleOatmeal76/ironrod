@@ -1,6 +1,6 @@
 <script>
 	import { goto } from '$app/navigation';
-	import { api, refHref } from '#lib/api.js';
+	import { api, refHref, paraHref } from '#lib/api.js';
 	import NoteEditor from './NoteEditor.svelte';
 
 	/** @type {{ note: any, showAnchor?: boolean, onchanged?: () => void }} */
@@ -57,6 +57,8 @@
 		{/if}
 		{#if (showAnchor || note.relation === 'mentions') && note.anchor}
 			<a class="anchor mono" href={refHref(note.anchor)}>{note.anchor.label}</a>
+		{:else if showAnchor && note.para}
+			<a class="anchor mono talk" href={paraHref(note.para)}>{note.para.doc_title} ¶{note.para.position}</a>
 		{/if}
 		<span class="grow"></span>
 		{#if !editing && note.relation !== 'mentions'}
@@ -97,6 +99,7 @@
 	.meta { font-size: 11px; color: var(--text-faint); }
 	.anchor { font-size: 12px; color: var(--hl-doctrine); text-decoration: none; }
 	.anchor:hover { text-decoration: underline; }
+	.anchor.talk { color: var(--hl-question); }
 	.grow { flex: 1; }
 	.mini {
 		border: 0;

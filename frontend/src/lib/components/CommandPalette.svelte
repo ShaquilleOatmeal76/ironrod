@@ -56,7 +56,7 @@
 		const mine = ++seq;
 		timer = setTimeout(async () => {
 			const kinds =
-				m === 'verses' ? 'ref,books,verses' : m === 'notes' ? 'notes,tags' : m === 'tags' ? 'tags' : 'ref,books,verses,notes,tags';
+				m === 'verses' ? 'ref,books,verses' : m === 'notes' ? 'notes,tags,talks' : m === 'tags' ? 'tags' : 'ref,books,verses,notes,tags,talks';
 			try {
 				const r = await api.search(q, { kinds, limit: m === 'all' ? 5 : 12 });
 				if (mine === seq) res = r;
@@ -111,6 +111,16 @@
 					kind: 'note', icon: '¶', parts: n.parts,
 					meta: [n.anchor?.label, ...n.tags.map((t) => '#' + t)].filter(Boolean).join(' · '),
 					run: go(n.anchor ? refHref(n.anchor) : `/notes?q=${encodeURIComponent(text)}`)
+				}))
+			});
+
+		if (res?.talks?.items.length)
+			out.push({
+				title: `TALKS · ${res.talks.total}`,
+				items: res.talks.items.map((t) => ({
+					kind: 'talk', icon: '¶', title: t.title, parts: t.parts,
+					meta: [t.author, `¶${t.position}`].filter(Boolean).join(' · '),
+					run: go(`/doc/${t.doc_id}#p${t.position}`)
 				}))
 			});
 
@@ -330,6 +340,7 @@
 	.icon { width: 18px; text-align: center; font-size: 13px; padding-top: 1px; color: var(--text-faint); }
 	.k-verse, .k-ref, .k-book { color: var(--hl-doctrine); }
 	.k-note { color: var(--hl-promise); }
+	.k-talk { color: var(--hl-question); }
 	.k-command, .k-all { color: var(--accent); }
 	.k-tag { color: var(--text-muted); }
 	.body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }

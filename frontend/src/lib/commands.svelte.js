@@ -16,7 +16,9 @@ import { untrack } from 'svelte';
 export const palette = $state({
 	open: false,
 	query: '',
-	help: false
+	help: false,
+	/** when "g" was last pressed (two-key shortcuts like g n) */
+	gAt: 0
 });
 
 export function openPalette(query = '') {

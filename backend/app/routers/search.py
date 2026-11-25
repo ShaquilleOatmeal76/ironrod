@@ -65,11 +65,24 @@ def _notes(conn, refs, match, limit, offset):
     return {"total": total, "items": items}
 
 
+def _talks(conn, match, limit, offset):
+    total = conn.execute("SELECT COUNT(*) FROM doc_paras_fts WHERE doc_paras_fts MATCH ?", (match,)).fetchone()[0]
+    rows = conn.execute(
+        "SELECT p.id, p.position, d.id AS doc_id, d.title, d.author, c.kind,"
+        f" snippet(doc_paras_fts, 0, '{MARK_START}', '{MARK_END}', '\u2026', 16) AS snip"
+        " FROM doc_paras_fts JOIN doc_paras p ON p.id = doc_paras_fts.rowid JOIN docs d ON d.id = p.doc_id"
+        " JOIN collections c ON c.id = d.collection_id WHERE doc_paras_fts MATCH ?"
+        " ORDER BY bm25(doc_paras_fts) LIMIT ? OFFSET ?", (match, limit, offset)).fetchall()
+    return {"total": total, "items": [
+        {"para_id": r["id"], "doc_id": r["doc_id"], "position": r["position"], "kind": r["kind"],
+         "title": r["title"], "author": r["author"], "parts": marks_to_parts(r["snip"])} for r in rows]}
+
+
 @router.get("/search")
 def search(
     q: str = "",
     scope: str = Query("all", pattern="^(" + "|".join(SCOPES) + ")$"),
-    kinds: str = "ref,books,verses,notes,tags",
+    kinds: str = "ref,books,verses,notes,tags,talks",
     limit: int = Query(6, ge=1, le=100),
     offset: int = Query(0, ge=0),
     conn: sqlite3.Connection = Depends(get_conn),
@@ -78,7 +91,7 @@ def search(
     want = set(kinds.split(","))
     q = q.strip()
     out: dict = {"q": q, "ref": None, "books": [], "verses": {"total": 0, "items": []},
-                 "notes": {"total": 0, "items": []}, "tags": []}
+                 "notes": {"total": 0, "items": []}, "talks": {"total": 0, "items": []}, "tags": []}
     if not q:
         return out
 
@@ -105,6 +118,8 @@ def search(
                 out["verses"] = _verses(conn, match, scope, limit, offset)
             if "notes" in want:
                 out["notes"] = _notes(conn, refs, match, limit, offset)
+            if "talks" in want:
+                out["talks"] = _talks(conn, match, limit, offset)
         except sqlite3.OperationalError:
             pass  # a query FTS still can't parse just returns no text matches
     return out

@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
 	import { api, chapterHref } from '#lib/api.js';
-	import { reader, rememberLast } from '#lib/reader.svelte.js';
+	import { reader, rememberLast, refreshProgress } from '#lib/reader.svelte.js';
 	import { HIGHLIGHTS, byId, byKey } from '#lib/highlights.js';
 	import VersePanel from '#lib/components/VersePanel.svelte';
 	import { palette, registerCommands, pushRecent } from '#lib/commands.svelte.js';
@@ -43,6 +43,31 @@
 			else scroller?.scrollTo({ top: 0 });
 		});
 	});
+
+	// Reading tracker: "mark as read" at the end of a chapter (m).
+	let status = $state(/** @type {any} */ (null));
+	let week = $state(/** @type {any} */ (null));
+	$effect(() => {
+		const c = ch;
+		status = null;
+		api.chapterStatus(c.volume, c.book, c.chapter).then((s) => (status = s), () => {});
+	});
+	api.cfmWeek().then((w) => (week = w), () => {});
+	const inThisWeek = $derived(
+		week?.readings.some((r) => r.volume === ch.volume && r.book === ch.book && ch.chapter >= r.chapter && ch.chapter <= (r.end_chapter ?? r.chapter))
+	);
+
+	async function toggleRead() {
+		const next = !status?.read_today;
+		status = { ...status, read_today: next };
+		try {
+			status = await api.markRead(ch.volume, ch.book, ch.chapter, next);
+			flash(next ? 'marked read ✓' : 'unmarked');
+			refreshProgress();
+		} catch {
+			flash('couldn\u2019t save');
+		}
+	}
 
 	async function reloadAnnotations() {
 		ann = await api.annotations(ch.volume, ch.book, ch.chapter);
@@ -117,6 +142,8 @@
 			{ id: 'note', title: 'Write a note on this verse', group: 'verse', keys: 'n', run: openNotes, when: () => !!selected },
 			{ id: 'link', title: 'Link this verse to another', group: 'verse', keys: 'l', run: openLinks, when: () => !!selected },
 			{ id: 'copy', title: 'Copy verse with reference', group: 'verse', keys: 'y', run: copyVerse, when: () => !!selected },
+			{ id: 'mark-read', title: 'Mark chapter as read', hint: 'done finished', group: 'verse', keys: 'm', run: toggleRead },
+			{ id: 'split', title: 'Open this chapter in split view', group: 'go', run: () => goto(`/split?ref=${encodeURIComponent(ch.book_title + ' ' + ch.chapter)}`) },
 			{ id: 'next-ch', title: `Next chapter${ch.next ? ` (${ch.next.book_title} ${ch.next.chapter})` : ''}`, group: 'go', keys: ']', run: () => go(ch.next), when: () => !!ch.next },
 			{ id: 'prev-ch', title: `Previous chapter${ch.prev ? ` (${ch.prev.book_title} ${ch.prev.chapter})` : ''}`, group: 'go', keys: '[', run: () => go(ch.prev), when: () => !!ch.prev }
 		])
@@ -136,6 +163,7 @@
 	function onKey(e) {
 		const t = /** @type {HTMLElement} */ (e.target);
 		if (e.metaKey || e.ctrlKey || e.altKey || palette.open || palette.help) return;
+		if (Date.now() - palette.gAt < 800 || e.key === 'g') return; // part of a g-shortcut
 		if (t.closest('input, textarea, select, [contenteditable="true"]')) return;
 		const last = ch.verses.length;
 		if (e.key === 'j' || e.key === 'ArrowDown') {
@@ -162,6 +190,8 @@
 			openLinks();
 		} else if (selected && e.key === 'y') {
 			copyVerse();
+		} else if (e.key === 'm') {
+			toggleRead();
 		}
 	}
 </script>
@@ -215,6 +245,15 @@
 					</li>
 				{/each}
 			</ol>
+
+			<div class="done-row">
+				<button class="readbtn" class:on={status?.read_today} aria-pressed={!!status?.read_today} onclick={toggleRead}>
+					<span class="box" aria-hidden="true">{status?.read_today ? '✓' : ''}</span>
+					{status?.read_today ? 'Read today' : 'Mark as read'} <span class="mono key">m</span>
+				</button>
+				{#if status?.last_read && !status.read_today}<span class="mono faint">last read {status.last_read}</span>{/if}
+				{#if inThisWeek}<a class="mono cfm" href="/doc/{week.id}">this week's Come Follow Me →</a>{/if}
+			</div>
 
 			<div class="foot">
 				{#if ch.prev}
@@ -306,7 +345,14 @@
 	.key { color: var(--text-faint); }
 	.sep { width: 1px; height: 20px; background: var(--border-strong); margin: 0 4px; }
 
-	.foot { display: flex; justify-content: space-between; gap: 16px; margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border); }
+	.done-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 40px; }
+	.readbtn { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font-size: 14px; cursor: pointer; }
+	.readbtn .box { width: 20px; height: 20px; border-radius: 4px; border: 1.5px solid #3a4452; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--accent-ink); }
+	.readbtn.on { border-color: var(--accent-line); background: var(--accent-dim); color: var(--accent); }
+	.readbtn.on .box { background: var(--accent); border-color: var(--accent); }
+	.readbtn .key { color: var(--text-faint); font-size: 11px; }
+	.cfm { font-size: 12px; text-decoration: none; }
+	.foot { display: flex; justify-content: space-between; gap: 16px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
 	.footlink { display: flex; flex-direction: column; gap: 4px; color: var(--text); text-decoration: none; font-size: 15px; padding: 8px 0; }
 	.footlink.right { text-align: right; }
 	.footlink:hover { color: var(--accent); }

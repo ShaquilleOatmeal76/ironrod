@@ -11,7 +11,8 @@
 	import SuggestPopup from '#lib/components/SuggestPopup.svelte';
 	import CommandPalette from '#lib/components/CommandPalette.svelte';
 	import ShortcutsHelp from '#lib/components/ShortcutsHelp.svelte';
-	import { reader, lastRead } from '#lib/reader.svelte.js';
+	import MobileNav from '#lib/components/MobileNav.svelte';
+	import { reader, lastRead, install, watchInstall, promptInstall } from '#lib/reader.svelte.js';
 	import { palette, openPalette, registerCommands } from '#lib/commands.svelte.js';
 	import { api, chapterHref } from '#lib/api.js';
 
@@ -29,7 +30,13 @@
 			{ id: 'go-search', title: 'Open search page', group: 'go', keys: 'g s', run: () => goto('/search') },
 			{ id: 'go-read', title: 'Back to reading', group: 'go', keys: 'g r', run: backToReading },
 			{ id: 'new-note', title: 'New note (not tied to a verse)', group: 'notes', run: () => goto('/notes#new') },
+			{ id: 'go-plans', title: 'Plans & today\u2019s reading', group: 'go', keys: 'g p', run: () => goto('/plans') },
+			{ id: 'go-library', title: 'Talks & lessons library', hint: 'conference byu come follow me import', group: 'go', keys: 'g t', run: () => goto('/library') },
+			{ id: 'go-split', title: 'Split view: scripture + talk', group: 'go', keys: 'g v', run: () => goto('/split') },
+			{ id: 'go-graph', title: 'Study graph', group: 'go', keys: 'g g', run: () => goto('/graph') },
+			{ id: 'new-plan', title: 'Start a reading plan', group: 'go', run: () => goto('/plans') },
 			{ id: 'library', title: 'Open library', group: 'go', run: () => (reader.sidebarOpen = true), when: () => window.innerWidth <= 900 },
+			{ id: 'install', title: 'Install Iron Rod as an app', group: 'help', run: promptInstall, when: () => !!install.prompt },
 			{ id: 'help', title: 'Show keyboard shortcuts', group: 'help', keys: '?', run: () => (palette.help = true) },
 			...data.volumes.map((v) => ({
 				id: `vol-${v.slug}`,
@@ -57,18 +64,24 @@
 			openPalette();
 		} else if (e.key === '?') {
 			palette.help = true;
-		} else if (e.key === 'g') {
+		} else if (e.key === 'g' && !(Date.now() - gPressed < 800)) {
 			gPressed = Date.now();
+			palette.gAt = gPressed;
 		} else if (Date.now() - gPressed < 800) {
 			gPressed = 0;
 			if (e.key === 'n') goto('/notes');
 			else if (e.key === 's') goto('/search');
+			else if (e.key === 'p') goto('/plans');
+			else if (e.key === 't') goto('/library');
+			else if (e.key === 'v') goto('/split');
+			else if (e.key === 'g') goto('/graph');
 			else if (e.key === 'r') backToReading();
 		}
 	}
 
 	// Ping the server now and then so the status bar can show "offline".
 	onMount(() => {
+		watchInstall();
 		const check = () =>
 			api.health().then(
 				() => (reader.online = true),
@@ -114,6 +127,7 @@
 	</div>
 
 	<StatusBar />
+	<MobileNav />
 </div>
 
 <SuggestPopup />

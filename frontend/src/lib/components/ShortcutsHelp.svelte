@@ -8,6 +8,10 @@
 				['⌘K  /  Ctrl K', 'command palette'],
 				['/', 'command palette'],
 				['g  n', 'all notes'],
+				['g  p', 'plans & today\u2019s reading'],
+				['g  t', 'talks & lessons'],
+				['g  v', 'split view'],
+				['g  g', 'study graph'],
 				['g  s', 'search page'],
 				['g  r', 'back to reading'],
 				['?', 'this list']
@@ -18,7 +22,9 @@
 			keys: [
 				['j  /  ↓', 'next verse'],
 				['k  /  ↑', 'previous verse'],
-				[']  /  [', 'next / previous chapter'],
+				[']  /  [', 'next / previous chapter (or talk)'],
+				['m', 'mark chapter as read'],
+				['s', 'open a talk in split view'],
 				['esc', 'clear selection']
 			]
 		},
@@ -32,6 +38,14 @@
 				['n', 'write a note'],
 				['l', 'link to another verse'],
 				['y', 'copy with reference']
+			]
+		},
+		{
+			title: 'Split view',
+			keys: [
+				['click', 'select a verse or paragraph'],
+				['shift-click', 'select a range of verses'],
+				['↵', 'link the selection']
 			]
 		},
 		{

@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from app import notes_html
 from app.deps import get_conn, get_refs, get_user_id
 from app.search import fts_query
+from app.routers.docs import para_ref
 
 router = APIRouter(prefix="/api", tags=["markup"])
 
@@ -34,7 +35,7 @@ def _chapter_bounds(conn, volume, book, chapter):
     return row
 
 
-def _note_dict(conn, refs, row, relation="on"):
+def note_dict(conn, refs, row, relation="on"):
     tags = [r[0] for r in conn.execute(
         "SELECT t.name FROM note_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.note_id = ? ORDER BY t.name",
         (row["id"],))]
@@ -42,9 +43,10 @@ def _note_dict(conn, refs, row, relation="on"):
         "SELECT start_verse_id, end_verse_id FROM note_refs WHERE note_id = ? ORDER BY start_verse_id",
         (row["id"],))]
     anchor = refs.describe(row["start_verse_id"], row["end_verse_id"]) if row["start_verse_id"] else None
+    para = para_ref(conn, row["para_id"]) if row["para_id"] else None
     return {
         "id": row["id"], "html": row["body_html"], "text": row["body_text"], "tags": tags,
-        "anchor": anchor, "mentions": mentions, "relation": relation,
+        "anchor": anchor, "para": para, "mentions": mentions, "relation": relation,
         "created_at": row["created_at"], "updated_at": row["updated_at"],
     }
 
@@ -118,6 +120,11 @@ def chapter_annotations(volume: str, book: str, chapter: int, conn=Depends(get_c
         touched = set(range(max(s1, first), min(e1, last) + 1)) | set(range(max(s2, first), min(e2, last) + 1))
         for vid in touched:
             slot(vid)["links"] += 1
+    for s1, e1 in conn.execute(
+            "SELECT start_verse_id, end_verse_id FROM para_links WHERE start_verse_id <= ? AND end_verse_id >= ?",
+            (last, first)):
+        for vid in range(max(s1, first), min(e1, last) + 1):
+            slot(vid)["links"] += 1
     return out
 
 
@@ -144,12 +151,16 @@ def verse_details(verse_id: int, conn=Depends(get_conn), refs=Depends(get_refs),
             (verse_id, verse_id, verse_id, verse_id)):
         on_a = l["a_start_verse_id"] <= verse_id <= l["a_end_verse_id"]
         other = (l["b_start_verse_id"], l["b_end_verse_id"]) if on_a else (l["a_start_verse_id"], l["a_end_verse_id"])
-        links.append({"id": l["id"], "label": l["label"], "other": refs.describe(*other)})
+        links.append({"id": l["id"], "label": l["label"], "kind": "verse", "other": refs.describe(*other)})
+    for l in conn.execute(
+            "SELECT * FROM para_links WHERE start_verse_id <= ? AND end_verse_id >= ? ORDER BY created_at DESC",
+            (verse_id, verse_id)):
+        links.append({"id": l["id"], "label": l["label"], "kind": "para", "other": para_ref(conn, l["para_id"])})
     return {
         "ref": refs.describe(verse_id, verse_id),
         "highlight": hl[0] if hl else None,
-        "notes": [_note_dict(conn, refs, n, "on") for n in on]
-                 + [_note_dict(conn, refs, n, "mentions") for n in mentioned],
+        "notes": [note_dict(conn, refs, n, "on") for n in on]
+                 + [note_dict(conn, refs, n, "mentions") for n in mentioned],
         "links": links,
     }
 
@@ -182,6 +193,7 @@ class NoteIn(BaseModel):
     body_html: str = Field(max_length=MAX_NOTE_HTML)
     start_verse_id: int | None = None
     end_verse_id: int | None = None
+    para_id: int | None = None
 
 
 class NotePatch(BaseModel):
@@ -205,23 +217,26 @@ def list_notes(q: str | None = None, tag: str | None = None, limit: int = Query(
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY n.updated_at DESC, n.id DESC LIMIT ?"
     args.append(limit)
-    return [_note_dict(conn, refs, n) for n in conn.execute(sql, args)]
+    return [note_dict(conn, refs, n) for n in conn.execute(sql, args)]
 
 
 @router.post("/notes", status_code=201)
 def create_note(body: NoteIn, conn=Depends(get_conn), refs=Depends(get_refs),
                 user_id=Depends(get_user_id)):
     start, end = _check_range(conn, body.start_verse_id, body.end_verse_id, required=False)
+    if body.para_id is not None and not conn.execute(
+            "SELECT 1 FROM doc_paras WHERE id = ?", (body.para_id,)).fetchone():
+        raise HTTPException(422, "Unknown paragraph")
     html = notes_html.sanitize(body.body_html)
     parsed = notes_html.read(html)
     if not parsed["text"]:
         raise HTTPException(422, "Note is empty")
     with conn:
         cur = conn.execute(
-            "INSERT INTO notes (owner_id, start_verse_id, end_verse_id, body_html, body_text)"
-            " VALUES (?, ?, ?, ?, ?)", (user_id, start, end, html, parsed["text"]))
+            "INSERT INTO notes (owner_id, start_verse_id, end_verse_id, para_id, body_html, body_text)"
+            " VALUES (?, ?, ?, ?, ?, ?)", (user_id, start, end, body.para_id, html, parsed["text"]))
         _save_note_parts(conn, cur.lastrowid, parsed)
-    return _note_dict(conn, refs, conn.execute("SELECT * FROM notes WHERE id = ?", (cur.lastrowid,)).fetchone())
+    return note_dict(conn, refs, conn.execute("SELECT * FROM notes WHERE id = ?", (cur.lastrowid,)).fetchone())
 
 
 def _own_note(conn, note_id, user_id):
@@ -243,7 +258,7 @@ def update_note(note_id: int, body: NotePatch, conn=Depends(get_conn), refs=Depe
         conn.execute("UPDATE notes SET body_html = ?, body_text = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                      (html, parsed["text"], note_id))
         _save_note_parts(conn, note_id, parsed)
-    return _note_dict(conn, refs, conn.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone())
+    return note_dict(conn, refs, conn.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone())
 
 
 @router.delete("/notes/{note_id}", status_code=204)

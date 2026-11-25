@@ -1,6 +1,7 @@
 <script>
 	import { untrack } from 'svelte';
-	import { api, refHref } from '#lib/api.js';
+	import { api, refHref, paraHref } from '#lib/api.js';
+	import GraphView from './GraphView.svelte';
 	import { byId } from '#lib/highlights.js';
 	import NoteCard from './NoteCard.svelte';
 	import NoteEditor from './NoteEditor.svelte';
@@ -14,7 +15,7 @@
 	let { verseId, noteSignal = 0, linkSignal = 0, onchanged, onclose } = $props();
 
 	let details = $state(/** @type {any} */ (null));
-	let tab = $state(/** @type {'notes'|'links'} */ ('notes'));
+	let tab = $state(/** @type {'notes'|'links'|'graph'} */ ('notes'));
 	let error = $state('');
 	let reloadKey = $state(0);
 
@@ -102,8 +103,8 @@
 		}
 	}
 
-	async function removeLink(id) {
-		await api.deleteLink(id);
+	async function removeLink(l) {
+		await (l.kind === 'para' ? api.deleteParaLink(l.id) : api.deleteLink(l.id));
 		changed();
 	}
 
@@ -132,6 +133,7 @@
 			<button role="tab" aria-selected={tab === 'links'} class:on={tab === 'links'} onclick={() => (tab = 'links')}>
 				Links <span class="mono n">{linkCount}</span>
 			</button>
+			<button role="tab" aria-selected={tab === 'graph'} class:on={tab === 'graph'} onclick={() => (tab = 'graph')}>Graph</button>
 		</div>
 	</header>
 
@@ -147,6 +149,11 @@
 			{#each details.notes as note (note.id)}
 				<NoteCard {note} onchanged={changed} />
 			{/each}
+		{:else if tab === 'graph'}
+			{#key reloadKey}
+				<div class="graph"><GraphView params={{ verse_id: verseId, depth: 2 }} compact height="340px" /></div>
+			{/key}
+			<a class="mono small" href="/graph">open full graph →</a>
 		{:else}
 			<form class="addlink" onsubmit={addLink}>
 				<label class="field">
@@ -177,14 +184,16 @@
 				{#if linkError}<p class="err" role="alert">{linkError}</p>{/if}
 			</form>
 
-			{#each details.links as l (l.id)}
+			{#each details.links as l (l.kind + l.id)}
+				{@const href = l.kind === 'para' ? paraHref(l.other) : refHref(l.other)}
 				<div class="link">
 					<div class="link-top">
-						<a class="mono ref" href={refHref(l.other)}>{l.other.label}</a>
+						<span class="kind mono" class:talk={l.kind === 'para'}>{l.kind === 'para' ? 'TALK' : 'SCRIPTURE'}</span>
+						<a class="mono ref" class:talk={l.kind === 'para'} {href}>{l.other.label}</a>
 						<span class="grow"></span>
-						<button class="mini" aria-label="Remove link to {l.other.label}" onclick={() => removeLink(l.id)}>remove</button>
+						<button class="mini" aria-label="Remove link to {l.other.label}" onclick={() => removeLink(l)}>remove</button>
 					</div>
-					<a class="snippet" href={refHref(l.other)}>{l.other.text}</a>
+					<a class="snippet" {href}>{l.other.text}</a>
 					<div class="mono why">↳ {l.label}</div>
 				</div>
 			{/each}
@@ -196,7 +205,7 @@
 
 	{#if tab === 'notes'}
 		<div class="composer-wrap">
-			<NoteEditor onsave={addNote} focusSignal={composerFocus} saveLabel="Save note" footer="visible: household" />
+			<NoteEditor onsave={addNote} focusSignal={composerFocus} autofocus={composerFocus > 0} saveLabel="Save note" footer="visible: household" />
 		</div>
 	{/if}
 </section>
@@ -316,7 +325,11 @@
 		border-radius: 8px;
 		padding: 12px 14px;
 	}
-	.link-top { display: flex; align-items: center; }
+	.link-top { display: flex; align-items: center; gap: 8px; }
+	.kind { font-size: 9px; letter-spacing: 0.1em; color: var(--hl-doctrine); border: 1px solid #2b3b66; border-radius: 3px; padding: 1px 5px; }
+	.kind.talk { color: var(--hl-question); border-color: #4a3766; }
+	.ref.talk { color: var(--hl-question); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+	.graph { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; }
 	.ref { font-size: 13px; font-weight: 600; color: var(--hl-doctrine); text-decoration: none; }
 	.snippet {
 		display: block;

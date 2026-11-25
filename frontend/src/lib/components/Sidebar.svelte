@@ -1,6 +1,7 @@
 <script>
 	import { chapterHref } from '#lib/api.js';
-	import { reader } from '#lib/reader.svelte.js';
+	import { reader, install, promptInstall } from '#lib/reader.svelte.js';
+	import { page } from '$app/state';
 
 	/** @type {{ volumes: any[] }} */
 	let { volumes } = $props();
@@ -47,16 +48,13 @@
 		<input type="search" placeholder="filter books…" bind:value={filter} />
 	</label>
 
-	<a class="volume notes-link" href="/search" onclick={close}>
-		<span class="dot" aria-hidden="true"></span>
-		<span class="grow">Search</span>
-		<span class="mono faint">g s</span>
-	</a>
-	<a class="volume notes-link" href="/notes" onclick={close}>
-		<span class="dot" aria-hidden="true"></span>
-		<span class="grow">All Notes</span>
-		<span class="mono faint">g n</span>
-	</a>
+	{#each [['/plans', 'Plans', 'g p'], ['/library', 'Talks & lessons', 'g t'], ['/notes', 'All Notes', 'g n'], ['/split', 'Split view', 'g v'], ['/graph', 'Graph', 'g g'], ['/search', 'Search', 'g s']] as [href, label, keys]}
+		<a class="volume notes-link" class:active={page.url.pathname === href} {href} onclick={close}>
+			<span class="dot" aria-hidden="true"></span>
+			<span class="grow">{label}</span>
+			<span class="mono faint">{keys}</span>
+		</a>
+	{/each}
 	<div class="label mono lib">LIBRARY</div>
 	<nav>
 		{#each filtered as v (v.slug)}
@@ -113,6 +111,14 @@
 			{/if}
 		{/each}
 	</nav>
+
+	{#if install.prompt}
+		<button class="install" onclick={promptInstall}>
+			<span class="mono">↓</span> Install Iron Rod app
+		</button>
+	{:else if install.ios}
+		<p class="install-hint">On iPhone: tap <b>Share</b>, then <b>Add to Home Screen</b> to install Iron Rod.</p>
+	{/if}
 </aside>
 
 {#if reader.sidebarOpen}
@@ -206,6 +212,13 @@
 	}
 	.chap:hover { border-color: var(--border-strong); color: var(--text); }
 	.chap.current { background: var(--accent-dim); border-color: var(--accent-line); color: var(--accent); }
+	.install {
+		display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 18px; padding: 10px 12px;
+		border: 1px solid var(--accent-line); border-radius: var(--radius); background: var(--accent-dim);
+		color: var(--accent); font-size: 13px; font-weight: 600;
+	}
+	.install-hint { margin: 18px 4px 0; font-size: 12px; line-height: 1.5; color: var(--text-faint); }
+	.install-hint b { color: var(--text-muted); font-weight: 600; }
 	.scrim { display: none; }
 
 	@media (max-width: 900px) {

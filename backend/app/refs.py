@@ -143,13 +143,17 @@ class RefIndex:
                 return f"{title} {a['ch']}:{a['vs']}"
             return f"{title} {a['ch']}:{a['vs']}–{b['vs']}"
         end_title = display_title(self.books[b["book_id"]].title)
+        whole = a["vs"] == 1 and b["vs"] == b["last"]
         if a["book_id"] == b["book_id"]:
+            if whole:
+                return f"{title} {a['ch']}\u2013{b['ch']}"
             return f"{title} {a['ch']}:{a['vs']}–{b['ch']}:{b['vs']}"
         return f"{title} {a['ch']}:{a['vs']} – {end_title} {b['ch']}:{b['vs']}"
 
     def describe(self, start_id: int, end_id: int) -> dict:
         """Everything the UI needs to show and open a range."""
         a = self._where(start_id)
+        z = self._where(end_id) if end_id != start_id else a
         book = self.books[a["book_id"]]
         text = " ".join(r[0] for r in self.conn.execute(
             "SELECT text FROM verses WHERE id BETWEEN ? AND ? ORDER BY id LIMIT 4",
@@ -158,5 +162,68 @@ class RefIndex:
             "start_verse_id": start_id, "end_verse_id": end_id,
             "label": self.label(start_id, end_id),
             "volume": book.volume, "book": book.slug, "chapter": a["ch"], "verse": a["vs"],
+            "end_chapter": z["ch"] if z["book_id"] == a["book_id"] else a["ch"],
             "text": text if len(text) <= 280 else text[:277].rsplit(" ", 1)[0] + "…",
         }
+
+
+# --- lists of references ("Genesis 1–2; Moses 2–3; Abraham 4:1-5") -------------
+_SEG_RE = re.compile(
+    r"^\s*(?:(?P<book>\d?\s*[^\d;,]*?[^\d\s;,][^\d;,]*?)\s+)?"
+    r"(?P<c1>\d+)(?::(?P<v1>\d+))?"
+    r"(?:\s*[-–—]\s*(?P<c2>\d+)(?::(?P<v2>\d+))?)?\s*$"
+)
+
+
+def _chapter_bounds(conn, book_id: int, ch: int):
+    return conn.execute(
+        "SELECT MIN(v.id), MAX(v.id), MAX(v.number) FROM verses v"
+        " JOIN chapters c ON c.id = v.chapter_id WHERE c.book_id = ? AND c.number = ?",
+        (book_id, ch)).fetchone()
+
+
+def parse_many(index: "RefIndex", text: str) -> list[tuple[int, int]]:
+    """Parse a reading list into verse-id ranges.
+
+    Understands what Come Follow Me headings look like: segments split by ';',
+    a book name carried forward when left out, chapter ranges ("1–2"),
+    verse ranges ("3:1-5") and cross-chapter ranges ("3:5-4:2").
+    Anything it can't read is skipped.
+    """
+    out: list[tuple[int, int]] = []
+    book = None
+    for seg in re.split(r"[;\n]", text or ""):
+        seg = seg.strip().rstrip(".")
+        if not seg:
+            continue
+        m = _SEG_RE.match(seg)
+        if not m:
+            continue
+        if m["book"]:
+            found = index.find_book(m["book"])
+            if not found:
+                continue
+            book = found
+        if book is None:
+            continue
+        c1, v1 = int(m["c1"]), int(m["v1"]) if m["v1"] else None
+        c2 = int(m["c2"]) if m["c2"] else None
+        v2 = int(m["v2"]) if m["v2"] else None
+        if v1 is not None and c2 is not None and v2 is None:
+            # "3:1-5" -> verses 1..5 of chapter 3
+            c2, v2 = c1, c2
+        a = _chapter_bounds(index.conn, book.id, c1)
+        if a[0] is None:
+            continue
+        if c2 is None:
+            start = a[0] + (v1 - 1 if v1 else 0)
+            end = start if v1 else a[1]
+        else:
+            b = _chapter_bounds(index.conn, book.id, c2)
+            if b[0] is None:
+                continue
+            start = a[0] + (v1 - 1 if v1 else 0)
+            end = b[0] + (v2 - 1) if v2 else b[1]
+        if end >= start:
+            out.append((start, end))
+    return out

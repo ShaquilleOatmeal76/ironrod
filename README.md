@@ -13,11 +13,11 @@ notes stay on your server.
 | 1 | Foundation: repo, scripture data, reader | ✅ done |
 | 2 | Markup: highlights, notes (rich editor), links | ✅ done |
 | 3 | Finding things: command palette (⌘K), search, shortcuts | ✅ done |
-| 4 | Talks & more: conference, BYU speeches, Come Follow Me, split view | ⏳ next |
-| 5 | Plans & goals: reading plans, tracker | |
-| 6 | Polish: graph view, phone layout, remote access, installable app | |
-| 7 | Phone app: Capacitor wrapper, offline reading, notifications | |
-| later | Family accounts, groups, private journal | |
+| 4 | Talks & more: conference, BYU speeches, Come Follow Me, split view | ✅ done |
+| 5 | Plans & goals: reading plans, tracker | ✅ done |
+| 6 | Polish: graph view, phone layout, installable web app, offline reading | ✅ done |
+| next | Family accounts, sharing groups, private journal | |
+| later | Store app (Capacitor wrapper): notifications, App Store/TestFlight | |
 
 ## Run it (Docker)
 
@@ -27,7 +27,8 @@ cd ironrod
 docker compose up -d --build
 ```
 
-Open `http://<your-server>:8642`. On first start it downloads the scripture
+Open `http://<your-server>:8642`, or set up HTTPS over Tailscale so it can be
+installed as an app on phones: see **[docs/ACCESS.md](docs/ACCESS.md)**. On first start it downloads the scripture
 data (~8 MB) and loads it into `./data/ironrod.db`. That takes a few seconds.
 
 **Back up `./data/`.** That folder is your whole library: notes, highlights,
@@ -67,15 +68,19 @@ ironrod/
 │   │   ├── main.py          app setup; serves /api and the built web app
 │   │   ├── db.py            connection + migration runner
 │   │   ├── migrations/      numbered .sql files, run once each, in order
-│   │   └── routers/         API endpoints, grouped by feature
-│   ├── scripts/
-│   │   └── import_scriptures.py
+│   │   ├── refs.py          "alma 32:21", "Genesis 1–2; Moses 2–3" -> verse ranges
+│   │   ├── importers/       fetch + parse conference, Come Follow Me, BYU; background jobs
+│   │   └── routers/         API endpoints: library, markup, search, docs, plans, graph
+│   ├── scripts/             import_scriptures.py, import_content.py
 │   └── tests/
 ├── frontend/                SvelteKit (Svelte 5) · built as a single-page app
+│   ├── static/              icons + manifest (installable web app)
 │   └── src/
 │       ├── app.css          theme tokens: every color and font lives here
+│       ├── service-worker.js  offline cache for the app and what you've read
 │       ├── lib/             shared state, API client, components
-│       └── routes/          pages: /read/[volume]/[book]/[chapter]
+│       └── routes/          read, doc, library, split, plans, notes, search, graph
+├── docs/ACCESS.md           HTTPS over Tailscale, installing on phones, backups
 ├── Dockerfile               builds the web app, then bundles it with the API
 └── docker-compose.yml
 ```
@@ -109,6 +114,40 @@ A few ideas worth knowing:
 - **Shared reading state.** `frontend/src/lib/reader.svelte.js` holds what's
   open and selected. The header, sidebar and status bar all read from it.
 
+## What's in it
+
+- **Reader** for the standard works, with meaning-based highlights, rich notes
+  (`@verse` references, `#tags`) and two-way links.
+- **Talks & lessons:** import General Conference (any session since 1971),
+  Come Follow Me (with each week's dates and reading) and BYU speeches from
+  the Library page. Read, highlight and note them like scripture.
+- **Split view:** scripture on one side, a talk on the other. Select verses
+  (shift-click for a range) and a paragraph, then press ↵ to link them.
+- **Plans:** "read X by a date" (picks your daily chapters and adjusts if you
+  fall behind) or "follow Come Follow Me". Today's checklist, weekly goals,
+  streak and a six-month heatmap. Press `m` at the end of a chapter to mark it read.
+- **Graph:** everything you've connected, as a web you can explore.
+- **Command palette** (⌘K) and full-text search over scripture, talks and notes.
+- **Installable web app:** works on phones with a bottom tab bar, installs to
+  the home screen over HTTPS, and keeps what you've read available offline.
+
+## Importing talks and lessons
+
+Use **Talks & lessons → Import** in the app, or the command line:
+
+```bash
+docker compose exec ironrod python -m scripts.import_content conference 2024 10
+docker compose exec ironrod python -m scripts.import_content conference-range 2015 2026
+docker compose exec ironrod python -m scripts.import_content cfm 2026
+docker compose exec ironrod python -m scripts.import_content byu https://speeches.byu.edu/talks/<speaker>/<title>/
+```
+
+Importers wait a second between requests, identify themselves, skip anything
+already imported, and keep everything in your own database. They read the
+Church's content API (the same one the Gospel Library uses) and BYU's
+speech pages; if either site changes its markup, the parsers in
+`backend/app/importers/parse.py` are where to look.
+
 ## API
 
 | Method | Path | Returns |
@@ -125,7 +164,15 @@ A few ideas worth knowing:
 | PATCH/DELETE | `/api/notes/{id}` | edit · delete |
 | GET | `/api/tags` | tags with counts |
 | POST/DELETE | `/api/links`, `/api/links/{id}` | link two verses · remove |
-| GET | `/api/search?q=&scope=&kinds=&limit=&offset=` | reference, books, verses, notes and tags in one call |
+| GET | `/api/search?q=&scope=&kinds=&limit=&offset=` | reference, books, verses, notes, tags and talks in one call |
+| GET | `/api/library`, `/api/collections/{id}`, `/api/docs/{id}` | talks & lessons |
+| GET | `/api/paras/{id}` · PUT `/api/para-highlights` · POST/DELETE `/api/para-links` | paragraph markup |
+| POST | `/api/import` · GET `/api/import/jobs` | start an import · progress |
+| GET | `/api/cfm/week?on=` | this week's Come Follow Me lesson |
+| POST | `/api/read-log` · GET `/api/read-log/{volume}/{book}/{chapter}` | mark read · status |
+| GET/POST/DELETE | `/api/plans`, `/api/plans/preview`, `/api/plans/{id}` | reading plans |
+| GET | `/api/stats` · PUT `/api/goals` | streak, week, goals, heatmap |
+| GET | `/api/graph?verse_id=&para_id=&depth=` | the study graph |
 
 Interactive docs: `http://<server>:8642/docs`
 
@@ -143,6 +190,9 @@ Press `?` in the app for the full list.
 | `n` | write a note on the selected verse |
 | `l` | link the selected verse to another |
 | `y` | copy the verse with its reference |
+| `m` | mark the chapter as read |
+| `s` | (in a talk) open it in split view |
+| `g` then `p` / `t` / `v` / `g` | plans · talks & lessons · split view · graph |
 | `g` then `n` | all notes |
 | `g` then `s` | search page |
 | `g` then `r` | back to reading |
