@@ -19,10 +19,13 @@ COPY --from=web /web/build ./app/static
 ENV IRONROD_DB=/data/ironrod.db \
     PYTHONUNBUFFERED=1
 
-# Run as a non-root user; the database lives in the /data volume.
+# The server runs as the non-root "ironrod" user. The entrypoint starts as
+# root just to fix ownership of /data, then drops to that user.
 RUN useradd --uid 1000 --create-home ironrod && mkdir -p /data && chown ironrod /data
-USER ironrod
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 VOLUME /data
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"
