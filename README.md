@@ -27,7 +27,7 @@ cd ironrod
 docker compose up -d --build
 ```
 
-Open `http://<your-server>:8080`. On first start it downloads the scripture
+Open `http://<your-server>:8642`. On first start it downloads the scripture
 data (~8 MB) and loads it into `./data/ironrod.db`. That takes a few seconds.
 
 **Back up `./data/`.** That folder is your whole library: notes, highlights,
@@ -127,7 +127,7 @@ A few ideas worth knowing:
 | POST/DELETE | `/api/links`, `/api/links/{id}` | link two verses · remove |
 | GET | `/api/search?q=&scope=&kinds=&limit=&offset=` | reference, books, verses, notes and tags in one call |
 
-Interactive docs: `http://<server>:8080/docs`
+Interactive docs: `http://<server>:8642/docs`
 
 ## Keyboard
 
